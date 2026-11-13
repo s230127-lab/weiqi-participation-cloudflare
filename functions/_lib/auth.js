@@ -29,7 +29,7 @@ export async function requireFirebaseUser(request, env) {
     // cases distinct instead of reporting every failure as an expired login.
     const errorData = await response.json().catch(() => ({}));
     const googleMessage = String(errorData?.error?.message || "UNKNOWN");
-    const errorCode = googleMessage.split(/[\\s:]/, 1)[0].toUpperCase();
+    const errorCode = googleMessage.split(/[\s:]/, 1)[0].toUpperCase();
     console.error("Firebase token lookup rejected:", response.status, googleMessage);
 
     let message;
