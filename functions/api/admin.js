@@ -17,7 +17,7 @@ export async function onRequestGet({ request, env }) {
 
   try {
     const result = await env.DB.prepare(`
-      SELECT uid, email, class_name, student_number, answers_json, submitted_at
+      SELECT uid, email, class_name, student_number, answers_json, score, submitted_at
       FROM questionnaire_submissions
       ORDER BY submitted_at DESC
       LIMIT 1000
@@ -29,6 +29,7 @@ export async function onRequestGet({ request, env }) {
       className: row.class_name,
       studentNumber: row.student_number,
       answers: JSON.parse(row.answers_json || "{}"),
+      score: Number(row.score || 0),
       submittedAt: row.submitted_at
     }));
     return json({ records });
