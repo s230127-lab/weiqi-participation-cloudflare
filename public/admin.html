@@ -26,7 +26,7 @@
     </section>
     <section class="card" id="recordsCard" hidden>
       <div class="account-row"><div><p class="section-kicker">提交紀錄</p><h2 id="recordCount">0 份問卷</h2></div></div>
-      <div class="table-wrap"><table><thead><tr><th>提交時間</th><th>班級</th><th>班號</th><th>Google 電郵</th><th>分數</th><th>第 1 題</th><th>第 2 題</th><th>第 3 題</th><th>第 4 題</th><th>第 5 題</th></tr></thead><tbody id="recordsBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>提交時間</th><th>班級</th><th>班號</th><th>Google 電郵</th><th>分數</th><th>測驗結果</th><th>第 1 題</th><th>第 2 題</th><th>第 3 題</th><th>第 4 題</th><th>第 5 題</th></tr></thead><tbody id="recordsBody"></tbody></table></div>
     </section>
     <footer><a href="/">返回參與確認頁</a></footer>
   </main>
@@ -44,7 +44,7 @@
       for (const record of data) {
         const row = document.createElement("tr");
         const answers = ["q1", "q2", "q3", "q4", "q5"].map(key => (record.answers || {})[key] || "");
-        for (const value of [formatDate(record.submittedAt), record.className, record.studentNumber, record.email, `${record.score}/10`, ...answers]) {
+        for (const value of [formatDate(record.submittedAt), record.className, record.studentNumber, record.email, `${record.score}/10`, Number(record.score) >= 6 ? "合格（已通過）" : "不合格", ...answers]) {
           const cell = document.createElement("td");
           cell.textContent = value;
           row.appendChild(cell);
@@ -70,8 +70,8 @@
       } finally { $("loadButton").disabled = false; }
     }
     function downloadCsv() {
-      const header = ["提交時間", "班級", "班號", "Google 電郵", "分數", "UID", "第1題", "第2題", "第3題", "第4題", "第5題"];
-      const rows = records.map(r => [r.submittedAt, r.className, r.studentNumber, r.email, `${r.score}/10`, r.uid, ...["q1","q2","q3","q4","q5"].map(k => (r.answers || {})[k] || "")]);
+      const header = ["提交時間", "班級", "班號", "Google 電郵", "分數", "測驗結果", "UID", "第1題", "第2題", "第3題", "第4題", "第5題"];
+      const rows = records.map(r => [r.submittedAt, r.className, r.studentNumber, r.email, `${r.score}/10`, Number(r.score) >= 6 ? "合格（已通過）" : "不合格", r.uid, ...["q1","q2","q3","q4","q5"].map(k => (r.answers || {})[k] || "")]);
       const csv = "\uFEFF" + [header, ...rows].map(row => row.map(csvCell).join(",")).join("\r\n");
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
