@@ -70,6 +70,7 @@
         <div id="questionFields" class="question-list"></div>
         <div class="actions section-actions"><button id="submitButton" class="button primary" type="submit">提交問卷</button></div>
         <p id="formMessage" class="message" role="status" aria-live="polite"></p>
+        <p id="quizResult" class="message" role="status" aria-live="polite"></p>
       </form>
     </section>
 
@@ -259,7 +260,19 @@
       $("submitButton").disabled = true;
       $("formMessage").textContent = "正在提交問卷…";
       try {
-        await api("/api/questionnaire", { method: "POST", body: JSON.stringify(payload) });
+        const response = await fetch("/api/questionnaire", {
+          method: "POST",
+          headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (response.status === 422 && result.passed === false) {
+          $("quizResult").textContent = `本次得分：${result.score}/10。答錯題目：${(result.wrongQuestions || []).join("、") || "無"}。未達 6 分，請重新作答。`;
+          $("formMessage").textContent = result.message || "請重新作答。";
+          return;
+        }
+        if (!response.ok) throw new Error(result.error || `伺服器回應錯誤（${response.status}）。`);
+        $("quizResult").textContent = `測驗通過！得分：${result.score}/10。`;
         $("formMessage").textContent = "問卷提交成功，正在更新狀態…";
         await refreshStatus();
       } catch (error) {
