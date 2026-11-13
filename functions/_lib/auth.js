@@ -24,7 +24,44 @@ export async function requireFirebaseUser(request, env) {
   }
 
   if (!response.ok) {
-    return { error: json({ error: "登入已失效，請重新登入。" }, 401) };
+    // Google may reject the request because of an invalid/restricted API key,
+    // a disabled Identity Toolkit API, or an invalid ID token. Keep these
+    // cases distinct instead of reporting every failure as an expired login.
+    const errorData = await response.json().catch(() => ({}));
+    const googleMessage = String(errorData?.error?.message || "UNKNOWN");
+    const errorCode = googleMessage.split(/[\\s:]/, 1)[0].toUpperCase();
+    console.error("Firebase token lookup rejected:", response.status, googleMessage);
+
+    let message;
+    let status = 502;
+
+    if (errorCode === "API_KEY_INVALID") {
+      message = "Firebase API Key 無效（API_KEY_INVALID）。請核對 Cloudflare 的 FIREBASE_API_KEY。";
+    } else if (errorCode === "API_KEY_SERVICE_BLOCKED") {
+      message = "Firebase API Key 未獲准呼叫 Identity Toolkit API（API_KEY_SERVICE_BLOCKED）。請檢查 Google Cloud API 限制及 Identity Toolkit API。";
+    } else if (
+      errorCode === "API_KEY_HTTP_REFERRER_BLOCKED" ||
+      /referer.*blocked|blocked.*referer/i.test(googleMessage)
+    ) {
+      message = "API Key 的網站來源限制阻擋了 Cloudflare Functions（HTTP referrer blocked）。請勿用只允許瀏覽器網域的 Key 驗證伺服器請求。";
+    } else if (errorCode === "API_KEY_IP_ADDRESS_BLOCKED") {
+      message = "API Key 的 IP 限制阻擋了 Cloudflare Functions（API_KEY_IP_ADDRESS_BLOCKED）。";
+    } else if (
+      errorCode === "INVALID_ID_TOKEN" ||
+      errorCode === "TOKEN_EXPIRED" ||
+      errorCode === "USER_NOT_FOUND" ||
+      errorCode === "EMAIL_NOT_FOUND"
+    ) {
+      message = "登入憑證無效或已過期，請登出後重新使用 Google 登入。";
+      status = 401;
+    } else if (errorCode === "USER_DISABLED") {
+      message = "此 Firebase 帳戶已停用（USER_DISABLED），請聯絡網站管理員。";
+      status = 403;
+    } else {
+      message = `Firebase 登入驗證失敗（HTTP ${response.status}，${errorCode}）。請把這段錯誤訊息提供給網站管理員。`;
+    }
+
+    return { error: json({ error: message, code: errorCode }, status) };
   }
 
   const data = await response.json().catch(() => ({}));
