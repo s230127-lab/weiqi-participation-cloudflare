@@ -1,0 +1,1 @@
+ALTER TABLE questionnaire_submissions ADD COLUMN score INTEGER NOT NULL DEFAULT 0 CHECK (score BETWEEN 0 AND 10);
