@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eceae4">
+  <title>問卷管理</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="page-header">
+      <div><p class="eyebrow">WEIQI ONLINE · ADMIN</p><h1>問卷管理</h1><p class="subtitle">管理員可在此檢視及匯出已提交的問卷紀錄。</p></div>
+      <div class="mark" aria-hidden="true">管</div>
+    </header>
+    <section class="card">
+      <p class="section-kicker">管理員驗證</p>
+      <h2>輸入管理員存取密鑰</h2>
+      <p class="muted">密鑰由網站擁有人在 Cloudflare 儲存為 Worker Secret。不要將密鑰放入 GitHub 或分享給參與者。</p>
+      <div class="field-grid">
+        <div class="field full"><label for="adminKey">管理員密鑰</label><input id="adminKey" type="password" autocomplete="current-password" placeholder="輸入 Cloudflare ADMIN_KEY"></div>
+      </div>
+      <div class="actions section-actions"><button class="button primary" id="loadButton">載入紀錄</button><button class="button secondary" id="csvButton" disabled>匯出 CSV</button></div>
+      <p id="adminMessage" class="message" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card" id="recordsCard" hidden>
+      <div class="account-row"><div><p class="section-kicker">提交紀錄</p><h2 id="recordCount">0 份問卷</h2></div></div>
+      <div class="table-wrap"><table><thead><tr><th>提交時間</th><th>班級</th><th>班號</th><th>Google 電郵</th><th>第 1 題</th><th>第 2 題</th><th>第 3 題</th><th>第 4 題</th><th>第 5 題</th></tr></thead><tbody id="recordsBody"></tbody></table></div>
+    </section>
+    <footer><a href="/">返回參與確認頁</a></footer>
+  </main>
+  <script>
+    "use strict";
+    let records = [];
+    const $ = id => document.getElementById(id);
+    function csvCell(value) { return '"' + String(value ?? "").replace(/"/g, '""') + '"'; }
+    function formatDate(value) { return value ? new Date(value).toLocaleString("zh-HK") : "—"; }
+    function render(data) {
+      records = data;
+      $("recordsCard").hidden = false;
+      $("recordCount").textContent = `${data.length} 份問卷`;
+      $("recordsBody").replaceChildren();
+      for (const record of data) {
+        const row = document.createElement("tr");
+        const answers = ["q1", "q2", "q3", "q4", "q5"].map(key => (record.answers || {})[key] || "");
+        for (const value of [formatDate(record.submittedAt), record.className, record.studentNumber, record.email, ...answers]) {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.appendChild(cell);
+        }
+        $("recordsBody").appendChild(row);
+      }
+      $("csvButton").disabled = data.length === 0;
+    }
+    async function loadRecords() {
+      const key = $("adminKey").value;
+      if (!key) { $("adminMessage").textContent = "請先輸入管理員密鑰。"; return; }
+      $("loadButton").disabled = true;
+      $("adminMessage").textContent = "正在載入紀錄…";
+      try {
+        const response = await fetch("/api/admin", { headers: { "X-Admin-Key": key } });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `伺服器回應錯誤（${response.status}）。`);
+        render(data.records || []);
+        $("adminMessage").textContent = "紀錄已載入。請勿在共用電腦保留管理員密鑰。";
+      } catch (error) {
+        $("adminMessage").textContent = error.message;
+        $("recordsCard").hidden = true;
+      } finally { $("loadButton").disabled = false; }
+    }
+    function downloadCsv() {
+      const header = ["提交時間", "班級", "班號", "Google 電郵", "UID", "第1題", "第2題", "第3題", "第4題", "第5題"];
+      const rows = records.map(r => [r.submittedAt, r.className, r.studentNumber, r.email, r.uid, ...["q1","q2","q3","q4","q5"].map(k => (r.answers || {})[k] || "")]);
+      const csv = "\uFEFF" + [header, ...rows].map(row => row.map(csvCell).join(",")).join("\r\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url; link.download = "weiqi-questionnaire-responses.csv"; link.click();
+      URL.revokeObjectURL(url);
+    }
+    $("loadButton").addEventListener("click", loadRecords);
+    $("csvButton").addEventListener("click", downloadCsv);
+  </script>
+</body>
+</html>

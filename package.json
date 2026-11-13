@@ -1,0 +1,13 @@
+{
+  "name": "weiqi-participation-cloudflare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public --project-name weiqi-participation",
+    "db:migrate": "wrangler d1 migrations apply weiqi-participation --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

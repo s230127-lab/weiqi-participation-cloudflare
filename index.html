@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eceae4">
+  <meta name="description" content="圍棋參與紀錄及網站問卷">
+  <title>圍棋參與確認</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">WEIQI ONLINE · 匯文軒活動（19/11–20/11）</p>
+        <h1>圍棋展覽知識問答</h1>
+        <p class="subtitle">登入你的 Google 帳戶，完成知識問答並核對圍棋對局紀錄。</p>
+      </div>
+      <div class="mark" aria-hidden="true">圍</div>
+    </header>
+
+    <section class="card">
+      <div class="account-row">
+        <div>
+          <p class="section-kicker">玩家帳戶</p>
+          <h2 id="accountTitle">使用 Google 帳戶登入</h2>
+          <p id="accountEmail" class="muted">請使用你在 weiqi_online 遊戲中使用的帳戶。</p>
+        </div>
+        <div class="actions">
+          <button class="button primary" id="signInButton" type="button">Google 登入</button>
+          <button class="button secondary" id="signOutButton" type="button" hidden>登出</button>
+        </div>
+      </div>
+      <p id="message" class="message" role="status" aria-live="polite">登入後會自動核對你的遊戲及問卷狀態。</p>
+    </section>
+
+    <section class="card">
+      <p class="section-kicker">完成狀態</p>
+      <h2>參與條件</h2>
+      <div class="status-list">
+        <article class="status-row">
+          <div class="status-icon" aria-hidden="true">棋</div>
+          <div><h3>完成至少一盤圍棋</h3><p id="gameDetail">登入後檢查你的遊戲紀錄。</p></div>
+          <span id="gameBadge" class="pill wait">待核對</span>
+        </article>
+        <article class="status-row">
+          <div class="status-icon" aria-hidden="true">表</div>
+          <div><h3>提交圍棋知識問答</h3><p id="formDetail">登入後檢查你的問卷提交狀態。</p></div>
+          <span id="formBadge" class="pill wait">待核對</span>
+        </article>
+      </div>
+      <div class="final-row">
+        <div><h3 id="finalTitle">尚未完成核對</h3><p id="finalDetail" class="muted">登入後會自動檢查以上條件。</p></div>
+        <span id="finalBadge" class="pill wait">未完成</span>
+      </div>
+      <div class="actions section-actions"><button id="refreshButton" class="button primary" type="button" disabled>重新核對</button></div>
+    </section>
+
+    <section id="questionnaireCard" class="card" hidden>
+      <p class="section-kicker">網站內置問卷</p>
+      <h2>圍棋展覽知識問答</h2>
+      <p class="subtitle">匯文軒活動（19/11–20/11）。請填寫班級、班號，並選擇每題一個答案。所有題目均為必答。</p>
+      <form id="questionnaireForm">
+        <div class="field-grid">
+          <div class="field"><label for="className">班級</label><input id="className" maxlength="40" required placeholder="例如：中一甲"></div>
+          <div class="field"><label for="studentNumber">班號</label><input id="studentNumber" maxlength="30" required placeholder="請輸入班號"></div>
+        </div>
+        <div id="questionFields" class="question-list"></div>
+        <div class="actions section-actions"><button id="submitButton" class="button primary" type="submit">提交問卷</button></div>
+        <p id="formMessage" class="message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <footer>圍棋參與紀錄系統 · 適用於電腦、平板及手機</footer>
+  </main>
+
+  <script>
+    "use strict";
+    // This is the existing public Firebase web configuration for weiqi-online.
+    // The API key is not a password. Restrict it to the required Google APIs in Google Cloud Console.
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyBOcBPN-D8S4-4LJ6LwzGcBV-N4CI60bdzI",
+      authDomain: "weiqi-online.firebaseapp.com",
+      projectId: "weiqi-online",
+      storageBucket: "weiqi-online.firebasestorage.app",
+      messagingSenderId: "950011884276",
+      appId: "1:950011884276:web:2241c6311e1ee79b1424a1"
+    };
+
+    // 問卷題目及選項；前端與後端均會驗證答案必須屬於指定選項。
+    const QUESTIONS = [
+      {
+        id: "q1",
+        title: "1. 相傳圍棋由誰在約四千年前發明，用來教導兒子丹朱？",
+        options: ["堯帝", "孫子", "李世石", "「爛柯」傳說中的樵夫"]
+      },
+      {
+        id: "q2",
+        title: "2. 2016 年發生了哪一項圍棋發展的里程碑？",
+        options: ["圍棋傳入朝鮮半島和日本", "日本設立獲幕府支持的圍棋家元", "AlphaGo 以四比一擊敗世界冠軍李世石", "最早可靠的圍棋記載見於《左傳》"]
+      },
+      {
+        id: "q3",
+        title: "3. 根據「佈局」規則，標準圍棋是如何進行的？",
+        options: ["黑先白後，雙方輪流把棋子下在 19×19 棋盤的交叉點上", "白先黑後，雙方輪流把棋子下在棋盤的方格內", "雙方輪流沿著棋盤的線移動棋子", "黑方先連下兩子，然後才輪到白方下棋"]
+      },
+      {
+        id: "q4",
+        title: "4. 在圍棋規則中，棋子或棋群旁邊的空點稱為甚麼？",
+        options: ["劫", "貼目", "氣", "禁入點"]
+      },
+      {
+        id: "q5",
+        title: "5. 圍棋終局時，白方為甚麼可獲「貼目」？",
+        options: ["補償黑方先行的優勢", "獎勵白方提走最多棋子", "解決「劫」的重複局面規則", "調整使用九路棋盤而非十九路棋盤的差異"]
+      }
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    let auth;
+    let currentUser = null;
+    let checking = false;
+    let submitting = false;
+    let submitted = false;
+
+    function badge(element, text, state) {
+      element.textContent = text;
+      element.className = `pill ${state}`;
+    }
+
+    function setMessage(text) { $("message").textContent = text; }
+
+    function renderQuestions() {
+      const container = $("questionFields");
+      for (const question of QUESTIONS) {
+        const fieldset = document.createElement("fieldset");
+        fieldset.className = "question choice-question";
+        const legend = document.createElement("legend");
+        legend.textContent = question.title;
+        fieldset.appendChild(legend);
+
+        const options = document.createElement("div");
+        options.className = "choice-list";
+        question.options.forEach((option, index) => {
+          const label = document.createElement("label");
+          label.className = "choice-option";
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.name = question.id;
+          input.value = option;
+          input.required = index === 0;
+          const text = document.createElement("span");
+          text.textContent = option;
+          label.append(input, text);
+          options.appendChild(label);
+        });
+
+        fieldset.appendChild(options);
+        container.appendChild(fieldset);
+      }
+    }
+
+    function setCompletion(gameDone, formDone) {
+      if (gameDone && formDone) {
+        $("finalTitle").textContent = "恭喜，兩項條件均已完成";
+        $("finalDetail").textContent = "你的圍棋參與紀錄已符合完成資格。";
+        badge($("finalBadge"), "已完成", "done");
+      } else {
+        const missing = [];
+        if (!gameDone) missing.push("完成至少一盤圍棋");
+        if (!formDone) missing.push("提交網站問卷");
+        $("finalTitle").textContent = "尚未符合完成資格";
+        $("finalDetail").textContent = `尚欠：${missing.join("、")}。`;
+        badge($("finalBadge"), "未完成", "issue");
+      }
+    }
+
+    async function authHeaders() {
+      if (!currentUser) throw new Error("請先登入。");
+      const token = await currentUser.getIdToken();
+      return { "Authorization": `Bearer ${token}` };
+    }
+
+    async function api(path, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (currentUser) Object.assign(headers, await authHeaders());
+      if (options.body) headers["Content-Type"] = "application/json";
+      const response = await fetch(path, { ...options, headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `伺服器回應錯誤（${response.status}）。`);
+      return data;
+    }
+
+    async function refreshStatus() {
+      if (!currentUser || checking) return;
+      checking = true;
+      $("refreshButton").disabled = true;
+      badge($("gameBadge"), "核對中", "wait");
+      badge($("formBadge"), "核對中", "wait");
+      setMessage("正在核對你的圍棋紀錄及問卷狀態…");
+      try {
+        const data = await api("/api/status");
+        const games = Math.max(0, Number(data.games || 0));
+        const gameDone = data.gameCompleted === true && games >= 1;
+        const formDone = data.formSubmitted === true;
+        $("gameDetail").textContent = `已記錄完成對局：${games} 盤。`;
+        $("formDetail").textContent = formDone ? "已找到你的問卷提交紀錄。" : "尚未找到問卷提交紀錄，請完成下方問卷。";
+        badge($("gameBadge"), gameDone ? "已完成" : "未完成", gameDone ? "done" : "issue");
+        badge($("formBadge"), formDone ? "已提交" : "未提交", formDone ? "done" : "issue");
+        setCompletion(gameDone, formDone);
+        submitted = formDone;
+        $("questionnaireCard").hidden = formDone;
+        if (formDone) $("formMessage").textContent = "此帳戶已提交問卷。如需更正，請聯絡管理員。";
+        setMessage("核對完成。");
+      } catch (error) {
+        console.error(error);
+        $("gameDetail").textContent = "未能讀取遊戲紀錄。";
+        $("formDetail").textContent = error.message;
+        badge($("gameBadge"), "無法核對", "fail");
+        badge($("formBadge"), "無法核對", "fail");
+        badge($("finalBadge"), "無法核對", "fail");
+        $("finalTitle").textContent = "暫時無法確認狀態";
+        $("finalDetail").textContent = error.message;
+        setMessage(error.message);
+      } finally {
+        checking = false;
+        $("refreshButton").disabled = !currentUser;
+      }
+    }
+
+    async function signIn() {
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: "select_account" });
+        await auth.signInWithPopup(provider);
+      } catch (error) {
+        console.error(error);
+        setMessage(`Google 登入失敗：${error.message || error.code || "請再試一次。"}`);
+      }
+    }
+
+    async function submitQuestionnaire(event) {
+      event.preventDefault();
+      if (!currentUser || submitting || submitted) return;
+      if (!$("questionnaireForm").reportValidity()) return;
+      const answers = {};
+      for (const question of QUESTIONS) {
+        const selected = document.querySelector(`input[name="${question.id}"]:checked`);
+        answers[question.id] = selected ? selected.value : "";
+      }
+      const payload = {
+        className: $("className").value.trim(),
+        studentNumber: $("studentNumber").value.trim(),
+        answers
+      };
+      submitting = true;
+      $("submitButton").disabled = true;
+      $("formMessage").textContent = "正在提交問卷…";
+      try {
+        await api("/api/questionnaire", { method: "POST", body: JSON.stringify(payload) });
+        $("formMessage").textContent = "問卷提交成功，正在更新狀態…";
+        await refreshStatus();
+      } catch (error) {
+        console.error(error);
+        $("formMessage").textContent = error.message;
+      } finally {
+        submitting = false;
+        $("submitButton").disabled = submitted;
+      }
+    }
+
+    function resetSignedOut() {
+      $("accountTitle").textContent = "使用 Google 帳戶登入";
+      $("accountEmail").textContent = "請使用你在 weiqi_online 遊戲中使用的帳戶。";
+      $("questionnaireCard").hidden = true;
+      badge($("gameBadge"), "待核對", "wait");
+      badge($("formBadge"), "待核對", "wait");
+      badge($("finalBadge"), "未完成", "wait");
+      $("gameDetail").textContent = "登入後檢查你的遊戲紀錄。";
+      $("formDetail").textContent = "登入後檢查你的問卷提交狀態。";
+      $("finalTitle").textContent = "尚未完成核對";
+      $("finalDetail").textContent = "登入後會自動檢查以上條件。";
+      setMessage("請使用你在 weiqi_online 遊戲中使用的 Google 帳戶登入。");
+    }
+
+    renderQuestions();
+    try {
+      if (!window.firebase) throw new Error("Firebase SDK 載入失敗。");
+      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      auth = firebase.auth();
+      $("signInButton").addEventListener("click", signIn);
+      $("signOutButton").addEventListener("click", () => auth.signOut());
+      $("refreshButton").addEventListener("click", refreshStatus);
+      $("questionnaireForm").addEventListener("submit", submitQuestionnaire);
+      auth.onAuthStateChanged((user) => {
+        currentUser = user || null;
+        $("signInButton").hidden = !!user;
+        $("signOutButton").hidden = !user;
+        $("refreshButton").disabled = !user;
+        if (!user) {
+          submitted = false;
+          $("questionnaireForm").reset();
+          resetSignedOut();
+          return;
+        }
+        $("accountTitle").textContent = user.displayName || "已登入";
+        $("accountEmail").textContent = user.email || "已登入 Google 帳戶";
+        refreshStatus();
+      });
+    } catch (error) {
+      console.error(error);
+      setMessage(`初始化失敗：${error.message}`);
+      $("signInButton").disabled = true;
+    }
+  </script>
+</body>
+</html>
