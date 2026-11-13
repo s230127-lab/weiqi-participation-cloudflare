@@ -11,5 +11,5 @@ FIREBASE_API_KEY = "AIzaSyBOcBPN-D8S4-4LJ6LwzGcBV-N4CI60bdzI"
 [[d1_databases]]
 binding = "DB"
 database_name = "weiqi-participation"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "5c72f0b5-4e5c-4234-b49c-f601de1de38f"
 migrations_dir = "migrations"
