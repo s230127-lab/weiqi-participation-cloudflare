@@ -6,7 +6,7 @@ compatibility_date = "2026-11-13"
 FIREBASE_PROJECT_ID = "weiqi-online"
 # Firebase Web API key (public client configuration, not a password).
 # It must be allowed to call identitytoolkit.googleapis.com and firestore.googleapis.com.
-FIREBASE_API_KEY = "AIzaSyBOcBPN-D8S4-4LJ6LwzGcBV-N4CI60bdzI"
+FIREBASE_API_KEY = "AIzaSyBOcBPN-D8S-4lJ6LwzGcBV-N4CI60bdzI"
 
 [[d1_databases]]
 binding = "DB"
