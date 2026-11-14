@@ -42,7 +42,7 @@
       <div class="status-list">
         <article class="status-row">
           <div class="status-icon" aria-hidden="true">棋</div>
-          <div><h3>完成至少一盤圍棋</h3><p id="gameDetail">登入後檢查你的遊戲紀錄。</p></div>
+          <div><h3>完成至少一盤圍棋</h3><p id="gameDetail">登入後檢查你的遊戲紀錄。</p><a id="playGoLink" class="button primary" href="https://s230127-lab.github.io/weiqi_online/" target="_blank" rel="noopener noreferrer" hidden style="margin-top:8px">前往下棋</a></div>
           <span id="gameBadge" class="pill wait">待核對</span>
         </article>
         <article class="status-row">
@@ -207,6 +207,7 @@
         const gameDone = data.gameCompleted === true && games >= 1;
         const formDone = data.formSubmitted === true;
         $("gameDetail").textContent = `已記錄完成對局：${games} 盤。`;
+        $("playGoLink").hidden = games >= 1;
         $("formDetail").textContent = formDone ? "已找到你的問卷提交紀錄。" : "尚未找到問卷提交紀錄，請完成下方問卷。";
         badge($("gameBadge"), gameDone ? "已完成" : "未完成", gameDone ? "done" : "issue");
         badge($("formBadge"), formDone ? "已提交" : "未提交", formDone ? "done" : "issue");
@@ -218,6 +219,7 @@
       } catch (error) {
         console.error(error);
         $("gameDetail").textContent = "未能讀取遊戲紀錄。";
+        $("playGoLink").hidden = true;
         $("formDetail").textContent = error.message;
         badge($("gameBadge"), "無法核對", "fail");
         badge($("formBadge"), "無法核對", "fail");
@@ -292,6 +294,7 @@
       badge($("formBadge"), "待核對", "wait");
       badge($("finalBadge"), "未完成", "wait");
       $("gameDetail").textContent = "登入後檢查你的遊戲紀錄。";
+      $("playGoLink").hidden = true;
       $("formDetail").textContent = "登入後檢查你的問卷提交狀態。";
       $("finalTitle").textContent = "尚未完成核對";
       $("finalDetail").textContent = "登入後會自動檢查以上條件。";
