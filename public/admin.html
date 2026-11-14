@@ -52,9 +52,43 @@
       for (const record of data) {
         const row = document.createElement("tr");
         const answers = ["q1", "q2", "q3", "q4", "q5"].map(key => (record.answers || {})[key] || "");
-        for (const value of [formatDate(record.submittedAt), record.className, record.studentNumber, record.email, `${record.score}/10`, Number(record.score) >= 6 ? "合格（已通過）" : "不合格", gameStatus(record), ...answers]) {
+        const basicValues = [
+          formatDate(record.submittedAt),
+          record.className,
+          record.studentNumber,
+          record.email,
+          `${record.score}/10`,
+          Number(record.score) >= 6 ? "合格（已通過）" : "不合格"
+        ];
+        for (const value of basicValues) {
           const cell = document.createElement("td");
-          cell.textContent = value;
+          cell.textContent = value ?? "—";
+          row.appendChild(cell);
+        }
+
+        // Offer a direct link only when Firebase confirms this player has zero completed games.
+        const statusCell = document.createElement("td");
+        const gameCountKnown = record.completedGames !== null
+          && record.completedGames !== undefined
+          && Number.isFinite(Number(record.completedGames));
+        if (gameCountKnown && Number(record.completedGames) === 0) {
+          statusCell.append("尚未完成 ");
+          const playLink = document.createElement("a");
+          playLink.className = "button primary";
+          playLink.href = "https://s230127-lab.github.io/weiqi_online/";
+          playLink.target = "_blank";
+          playLink.rel = "noopener noreferrer";
+          playLink.textContent = "前往下棋";
+          playLink.title = "在新分頁開啟圍棋遊戲";
+          statusCell.appendChild(playLink);
+        } else {
+          statusCell.textContent = gameStatus(record);
+        }
+        row.appendChild(statusCell);
+
+        for (const answer of answers) {
+          const cell = document.createElement("td");
+          cell.textContent = answer;
           row.appendChild(cell);
         }
         $("recordsBody").appendChild(row);
