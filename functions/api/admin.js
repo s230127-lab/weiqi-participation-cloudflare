@@ -1,4 +1,4 @@
-import { json } from "../_lib/auth.js";
+import { json, getCompletedGames } from "../_lib/auth.js";
 
 function safeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
@@ -30,8 +30,26 @@ export async function onRequestGet({ request, env }) {
       studentNumber: row.student_number,
       answers: JSON.parse(row.answers_json || "{}"),
       score: Number(row.score || 0),
-      submittedAt: row.submitted_at
+      submittedAt: row.submitted_at,
+      completedGames: null
     }));
+
+    // Read the player's completed-game count from the shared Firebase project.
+    // Keep the request concurrency bounded to avoid sending hundreds of requests at once.
+    const batchSize = 10;
+    for (let index = 0; index < records.length; index += batchSize) {
+      const batch = records.slice(index, index + batchSize);
+      await Promise.all(batch.map(async (record) => {
+        try {
+          record.completedGames = await getCompletedGames(record.uid, env);
+        } catch (error) {
+          // Null means the count could not be verified; it must not be shown as "not played".
+          console.error("Could not verify a participant's completed-game count:", error);
+          record.completedGames = null;
+        }
+      }));
+    }
+
     return json({ records });
   } catch (error) {
     console.error("Admin records query failed:", error);
