@@ -196,11 +196,12 @@
 
       outgoing.classList.remove("page-enter");
       outgoing.classList.add("page-leave");
-      outgoing.addEventListener("animationend", (event) => {
-        if (event.target === outgoing && event.animationName === "screen-exit") {
-          finishTransition();
-        }
-      }, { once: true });
+      const onExitEnd = (event) => {
+        if (event.target !== outgoing || event.animationName !== "screen-exit") return;
+        outgoing.removeEventListener("animationend", onExitEnd);
+        finishTransition();
+      };
+      outgoing.addEventListener("animationend", onExitEnd);
     }
 
     function badge(element, text, state) {
@@ -285,7 +286,7 @@
         const formDone = data.formSubmitted === true;
         $("gameDetail").textContent = `已記錄完成對局：${games} 盤。`;
         $("playGoLink").hidden = games >= 1;
-        $("formDetail").textContent = formDone ? "已找到你的問卷提交紀錄。" : "尚未找到問卷提交紀錄，請完成下方問卷。";
+        $("formDetail").textContent = formDone ? "已找到你的問卷提交紀錄。" : "尚未找到問卷提交紀錄，請按「前往知識問答」完成問卷。";
         badge($("gameBadge"), gameDone ? "已完成" : "未完成", gameDone ? "done" : "issue");
         badge($("formBadge"), formDone ? "已提交" : "未提交", formDone ? "done" : "issue");
         setCompletion(gameDone, formDone);
