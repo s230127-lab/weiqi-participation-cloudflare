@@ -157,6 +157,7 @@
     let submitted = false;
     let currentPage = "status";
     let pageTransitioning = false;
+    let pageTransitionId = 0;
 
     function showPage(target) {
       if (target !== "status" && target !== "quiz") return;
@@ -165,9 +166,11 @@
 
       const outgoing = target === "quiz" ? $("statusPage") : $("questionnaireCard");
       const incoming = target === "quiz" ? $("questionnaireCard") : $("statusPage");
+      const transitionId = ++pageTransitionId;
       pageTransitioning = true;
 
       const finishTransition = () => {
+        if (transitionId !== pageTransitionId) return;
         outgoing.hidden = true;
         outgoing.classList.remove("page-leave");
         incoming.hidden = false;
@@ -365,11 +368,16 @@
     }
 
     function resetSignedOut() {
-      showPage("status");
+      pageTransitionId += 1;
+      pageTransitioning = false;
+      currentPage = "status";
+      $("statusPage").hidden = false;
+      $("questionnaireCard").hidden = true;
+      $("statusPage").classList.remove("page-enter", "page-leave");
+      $("questionnaireCard").classList.remove("page-enter", "page-leave");
       $("quizNavButton").hidden = true;
       $("accountTitle").textContent = "使用 Google 帳戶登入";
       $("accountEmail").textContent = "請使用你在 weiqi_online 遊戲中使用的帳戶。";
-      $("questionnaireCard").hidden = true;
       badge($("gameBadge"), "待核對", "wait");
       badge($("formBadge"), "待核對", "wait");
       badge($("finalBadge"), "未完成", "wait");
