@@ -9,6 +9,30 @@
   <link rel="stylesheet" href="/style.css">
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+
+  <style>
+    #statusPage, #questionnaireCard {
+      transform-origin: top center;
+      will-change: opacity, transform, filter;
+    }
+    @keyframes screen-enter {
+      from { opacity: 0; transform: translateX(24px) translateY(8px) scale(.99); filter: blur(2px); }
+      to { opacity: 1; transform: translateX(0) translateY(0) scale(1); filter: blur(0); }
+    }
+    @keyframes screen-exit {
+      from { opacity: 1; transform: translateX(0) scale(1); }
+      to { opacity: 0; transform: translateX(-18px) scale(.99); }
+    }
+    .page-enter { animation: screen-enter .34s cubic-bezier(.2,.75,.25,1) both; }
+    .page-leave { animation: screen-exit .2s ease-in both; pointer-events: none; }
+    #quizBackButton { margin-bottom: 18px; }
+    .quiz-page .subtitle { margin-bottom: 18px; }
+    @media (prefers-reduced-motion: reduce) {
+      .page-enter, .page-leave { animation: none !important; }
+      #statusPage, #questionnaireCard { will-change: auto; }
+    }
+  </style>
+
 </head>
 <body>
   <main class="shell">
@@ -21,6 +45,7 @@
       <div class="mark" aria-hidden="true">圍</div>
     </header>
 
+    <div id="statusPage" class="app-screen">
     <section class="card">
       <div class="account-row">
         <div>
@@ -55,11 +80,16 @@
         <div><h3 id="finalTitle">尚未完成核對</h3><p id="finalDetail" class="muted">登入後會自動檢查以上條件。</p></div>
         <span id="finalBadge" class="pill wait">未完成</span>
       </div>
-      <div class="actions section-actions"><button id="refreshButton" class="button primary" type="button" disabled>重新核對</button></div>
+      <div class="actions section-actions">
+        <button id="quizNavButton" class="button primary" type="button" hidden>前往知識問答</button>
+        <button id="refreshButton" class="button secondary" type="button" disabled>重新核對</button>
+      </div>
     </section>
+    </div>
 
-    <section id="questionnaireCard" class="card" hidden>
-      <p class="section-kicker">網站內置問卷</p>
+    <section id="questionnaireCard" class="card quiz-page" hidden>
+      <button id="quizBackButton" class="button secondary" type="button">← 返回完成狀態</button>
+      <p class="section-kicker">獨立問卷頁面</p>
       <h2>圍棋展覽知識問答</h2>
       <p class="subtitle">匯文軒活動（19/11–20/11）。請填寫班級、班號，並選擇每題一個答案。所有題目均為必答。</p>
       <form id="questionnaireForm">
@@ -125,6 +155,50 @@
     let checking = false;
     let submitting = false;
     let submitted = false;
+    let currentPage = "status";
+    let pageTransitioning = false;
+
+    function showPage(target) {
+      if (target !== "status" && target !== "quiz") return;
+      if (target === "quiz" && (!currentUser || submitted)) return;
+      if (target === currentPage || pageTransitioning) return;
+
+      const outgoing = target === "quiz" ? $("statusPage") : $("questionnaireCard");
+      const incoming = target === "quiz" ? $("questionnaireCard") : $("statusPage");
+      pageTransitioning = true;
+
+      const finishTransition = () => {
+        outgoing.hidden = true;
+        outgoing.classList.remove("page-leave");
+        incoming.hidden = false;
+        incoming.classList.remove("page-enter");
+        void incoming.offsetWidth;
+        incoming.classList.add("page-enter");
+        incoming.addEventListener("animationend", (event) => {
+          if (event.target === incoming && event.animationName === "screen-enter") {
+            incoming.classList.remove("page-enter");
+          }
+        }, { once: true });
+        currentPage = target;
+        pageTransitioning = false;
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      };
+
+      const reduceMotion = window.matchMedia
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduceMotion) {
+        finishTransition();
+        return;
+      }
+
+      outgoing.classList.remove("page-enter");
+      outgoing.classList.add("page-leave");
+      outgoing.addEventListener("animationend", (event) => {
+        if (event.target === outgoing && event.animationName === "screen-exit") {
+          finishTransition();
+        }
+      }, { once: true });
+    }
 
     function badge(element, text, state) {
       element.textContent = text;
@@ -213,13 +287,17 @@
         badge($("formBadge"), formDone ? "已提交" : "未提交", formDone ? "done" : "issue");
         setCompletion(gameDone, formDone);
         submitted = formDone;
-        $("questionnaireCard").hidden = formDone;
-        if (formDone) $("formMessage").textContent = "此帳戶已提交問卷。如需更正，請聯絡管理員。";
+        $("quizNavButton").hidden = formDone;
+        if (formDone) {
+          $("formMessage").textContent = "此帳戶已提交問卷。如需更正，請聯絡管理員。";
+          if (currentPage === "quiz") showPage("status");
+        }
         setMessage("核對完成。");
       } catch (error) {
         console.error(error);
         $("gameDetail").textContent = "未能讀取遊戲紀錄。";
         $("playGoLink").hidden = true;
+        $("quizNavButton").hidden = true;
         $("formDetail").textContent = error.message;
         badge($("gameBadge"), "無法核對", "fail");
         badge($("formBadge"), "無法核對", "fail");
@@ -287,6 +365,8 @@
     }
 
     function resetSignedOut() {
+      showPage("status");
+      $("quizNavButton").hidden = true;
       $("accountTitle").textContent = "使用 Google 帳戶登入";
       $("accountEmail").textContent = "請使用你在 weiqi_online 遊戲中使用的帳戶。";
       $("questionnaireCard").hidden = true;
@@ -309,6 +389,8 @@
       $("signInButton").addEventListener("click", signIn);
       $("signOutButton").addEventListener("click", () => auth.signOut());
       $("refreshButton").addEventListener("click", refreshStatus);
+      $("quizNavButton").addEventListener("click", () => showPage("quiz"));
+      $("quizBackButton").addEventListener("click", () => showPage("status"));
       $("questionnaireForm").addEventListener("submit", submitQuestionnaire);
       auth.onAuthStateChanged((user) => {
         currentUser = user || null;
